@@ -72,6 +72,14 @@ function compterJournee(info) {
     h[cote] += dt;
   }
 
+  // Posture reconnue (bonne posture, penché à gauche, etc.)
+  if (info.posture) {
+    s.postures = s.postures || {};
+    h.postures = h.postures || {};
+    s.postures[info.posture] = (s.postures[info.posture] || 0) + dt;
+    h.postures[info.posture] = (h.postures[info.posture] || 0) + dt;
+  }
+
   // Dos
   if (info.dosAppuye !== null) s[info.dosAppuye ? "dosAppuye" : "dosDecolle"] += dt;
 
@@ -140,15 +148,40 @@ function afficherJournee() {
   $("contenuJournee").hidden = false;
   $("sousTitreJournee").textContent = duree(s.assis) + " assis · " + s.mouvements + " mouvements";
 
-  // Phrase résumé : le côté dominant
+  const C = COULEURS_JOURNEE;
   const totalCote = s.gauche + s.centre + s.droite;
   const parts = { gauche: pourcent(s.gauche, totalCote), centre: pourcent(s.centre, totalCote), droite: pourcent(s.droite, totalCote) };
-  const dominant = Object.keys(parts).reduce((a, b) => parts[a] >= parts[b] ? a : b);
-  const modele = { gauche: TEXTES.resumeGauche, centre: TEXTES.resumeCentre, droite: TEXTES.resumeDroite }[dominant];
-  $("phraseJournee").textContent = modele.replace("{pct}", parts[dominant]);
 
-  // Bande : côté
-  const C = COULEURS_JOURNEE;
+  // Postures : présentes seulement pour les journées enregistrées avec cette version
+  const totalPostures = s.postures ? Object.values(s.postures).reduce((a, b) => a + b, 0) : 0;
+  const avecPostures = totalPostures > 0;
+  $("blocPosture").hidden = !avecPostures;
+  $("blocCote").hidden = avecPostures;
+
+  if (avecPostures) {
+    // Phrase : % du temps en bonne posture + principale mauvaise habitude
+    const pct = id => pourcent(s.postures[id] || 0, totalPostures);
+    const bonnes = POSTURES.filter(p => p.bonne);
+    const mauvaises = POSTURES.filter(p => !p.bonne && pct(p.id) > 0).sort((a, b) => pct(b.id) - pct(a.id));
+    const pctBonne = bonnes.reduce((somme, p) => somme + pct(p.id), 0);
+    let phrase = TEXTES.resumePosture.replace("{pct}", pctBonne);
+    phrase += mauvaises.length
+      ? TEXTES.resumeHabitude.replace("{nom}", mauvaises[0].nom.toLowerCase()).replace("{pct}", pct(mauvaises[0].id))
+      : TEXTES.resumeParfait;
+    $("phraseJournee").textContent = phrase;
+
+    // Bande : une couleur par posture
+    $("bandePosture").innerHTML = POSTURES.map(p => segment(pct(p.id), p.couleur, pct(p.id) + " %")).join("");
+    $("legendePosture").innerHTML = POSTURES.map(p =>
+      `<span><i style="background:${p.couleur}"></i>${p.nom} ${pct(p.id)} %</span>`).join("");
+  } else {
+    // Anciennes journées (sans postures) : phrase sur le côté dominant
+    const dominant = Object.keys(parts).reduce((a, b) => parts[a] >= parts[b] ? a : b);
+    const modele = { gauche: TEXTES.resumeGauche, centre: TEXTES.resumeCentre, droite: TEXTES.resumeDroite }[dominant];
+    $("phraseJournee").textContent = modele.replace("{pct}", parts[dominant]);
+  }
+
+  // Bande : côté (anciennes journées)
   $("bandeCote").innerHTML =
     segment(parts.gauche, C.gauche, parts.gauche + " %") +
     segment(parts.centre, C.centre, parts.centre + " %", true) +
@@ -166,18 +199,23 @@ function afficherJournee() {
     segment(pA, C.dosAppuye, "Appuyé " + pA + " %") +
     segment(100 - pA, C.dosDecolle, "Décollé " + (100 - pA) + " %", true);
 
-  // Bande : heure par heure (couleur = côté dominant pendant l'heure)
+  // Bande : heure par heure (couleur = posture, ou côté, dominant pendant l'heure)
   const heures = Object.keys(s.heures).map(Number);
   const debut = Math.min(8, ...heures), fin = Math.max(17, ...heures);
   let html = "";
   for (let h = debut; h <= fin; h++) {
     const hh = s.heures[h];
-    let couleur = C.absent;
+    let couleur = C.absent, nom = "absent";
     if (hh && hh.assis >= 180) {                      // au moins 3 min assis dans l'heure
-      const cote = ["gauche", "centre", "droite"].reduce((a, b) => hh[a] >= hh[b] ? a : b);
-      couleur = C[cote];
+      if (avecPostures && hh.postures) {
+        const p = POSTURES.reduce((a, b) => (hh.postures[a.id] || 0) >= (hh.postures[b.id] || 0) ? a : b);
+        couleur = p.couleur; nom = p.nom;
+      } else {
+        const cote = ["gauche", "centre", "droite"].reduce((a, b) => hh[a] >= hh[b] ? a : b);
+        couleur = C[cote]; nom = cote;
+      }
     }
-    html += `<div style="flex:1;background:${couleur}" title="${h} h"></div>`;
+    html += `<div style="flex:1;background:${couleur}" title="${h} h : ${nom}"></div>`;
   }
   $("bandeHeures").innerHTML = html;
   const milieu = Math.round((debut + fin) / 2);

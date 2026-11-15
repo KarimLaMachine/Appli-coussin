@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Coussin intelligent</title>
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <main>
@@ -35,6 +35,7 @@
   <!-- ============ CALIBRATION (s'affiche pendant la calibration) ============ -->
   <div class="carte" id="calib">
     <div class="etape" id="calibEtape"></div>
+    <div class="dessin-posture grand-dessin" id="calibDessin"></div>
     <div class="consigne" id="calibConsigne"></div>
     <div class="compte" id="calibCompte"></div>
     <div class="etape" id="calibRecus"></div>
@@ -82,6 +83,13 @@
     <!-- ============ INDICATEURS ============ -->
     <div class="carte">
       <div class="indic">
+        <div class="titre">Posture</div>
+        <div class="posture-live">
+          <div class="dessin-posture" id="dessinPosture"></div>
+          <div class="grand" id="posture">--</div>
+        </div>
+      </div>
+      <div class="indic">
         <div class="titre">Présence</div>
         <div class="grand" id="presence">--</div>
       </div>
@@ -117,7 +125,13 @@
     <div class="phrase" id="phraseJournee"></div>
 
     <div id="contenuJournee" hidden>
-      <div class="bloc">
+      <div class="bloc" id="blocPosture">
+        <div class="titre-bloc">Posture</div>
+        <div class="bande" id="bandePosture"></div>
+        <div class="legende-bande" id="legendePosture"></div>
+      </div>
+
+      <div class="bloc" id="blocCote">
         <div class="titre-bloc">Côté où tu appuies</div>
         <div class="bande" id="bandeCote"></div>
         <div class="legende-bande" id="legendeCote"></div>
@@ -145,11 +159,12 @@
   </section>
 </main>
 
-<!-- L'ordre compte : config, la logique, le résumé, puis les sources de données.
-     Le « ?v=2 » force Chrome à recharger les fichiers : augmente ce numéro à chaque mise à jour. -->
-<script src="config.js?v=2"></script>
-<script src="app.js?v=2"></script>
-<script src="journee.js?v=2"></script>
-<script src="sources.js?v=2"></script>
+<!-- L'ordre compte : config, les dessins, la logique, le résumé, puis les sources de données.
+     Le « ?v=3 » force Chrome à recharger les fichiers : augmente ce numéro à chaque mise à jour. -->
+<script src="config.js?v=3"></script>
+<script src="dessins.js?v=3"></script>
+<script src="app.js?v=3"></script>
+<script src="journee.js?v=3"></script>
+<script src="sources.js?v=3"></script>
 </body>
 </html>

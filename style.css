@@ -91,6 +91,14 @@ svg { width: 100%; height: auto; display: block; }
 #calibResultat td, #calibResultat th { padding: 4px 12px; border-bottom: 1px solid var(--bord); }
 #btnFermerCalib { margin-top: 12px; }
 
+/* ---------- Dessins des postures ---------- */
+.dessin-posture svg, .dessin-posture img { width: 72px; height: 72px; display: block; }
+.grand-dessin svg, .grand-dessin img { width: 140px; height: 140px; margin: 8px auto; }
+.grand-dessin:empty { display: none; }
+.posture-live { display: flex; align-items: center; gap: 12px; }
+#posture { font-size: 1.4em; }
+.problemes { text-align: left; display: inline-block; margin: 8px auto 0; padding-left: 20px; color: var(--alerte); font-size: .9em; }
+
 /* ---------- Ma journée ---------- */
 .journee-entete { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .journee-entete button { font-size: 1.3em; line-height: 1; padding: 6px 14px; }

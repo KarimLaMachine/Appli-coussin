@@ -16,6 +16,8 @@ Application web qui se connecte au coussin par Bluetooth, le calibre et affiche 
 
 Tu peux aussi tester la **calibration** en mode démo : la personne simulée suit les consignes.
 
+La **calibration** se fait en plusieurs positions, chacune illustrée par un petit dessin : coussin vide, puis chaque posture de la liste `POSTURES` (bonne posture, penché à gauche, penché à droite). L'application garde la « signature » de chaque posture et reconnaît ensuite en direct **la plus ressemblante** (carte « Posture », en vert pour la bonne posture). Une posture qui n'a pas été apprise (ex. penché vers l'avant) est classée dans la plus proche : ajoute-la à `POSTURES` pour qu'elle soit reconnue.
+
 Plus bas, la section **Ma journée** résume chaque journée : côté où on appuie, dos, heure par heure, mouvements et plus longue période immobile. Les données de la démo et de la relecture sont gardées **séparément** des vraies journées (badge « Données de démo »), et un bouton permet de les effacer. La démo peut tourner des heures sans surveillance, même si l'onglet est en arrière-plan ; l'ordinateur ne doit simplement pas se mettre en veille.
 
 ---
@@ -29,6 +31,7 @@ Plus bas, la section **Ma journée** résume chaque journée : côté où on app
 | `config.js` | Les réglages : textes affichés, couleurs de pression, seuils, branchement des capteurs | Équipe (textes et couleurs) ; Vincent (sections ⚠️) |
 | `app.js` | La logique : calibration, calculs, mise à jour de l'affichage | Programmeurs |
 | `journee.js` | Le résumé « Ma journée » : comptage par jour, bandes, phrase résumé | Programmeurs |
+| `dessins.js` | Les petits dessins des postures (personne vue de dos sur une chaise) | Équipe design |
 | `sources.js` | D'où viennent les données : Bluetooth, démo, enregistrement, relecture | Vincent |
 | `exemple_session.csv` | Une session enregistrée pour les tests | — |
 
@@ -53,6 +56,10 @@ Plus bas, la section **Ma journée** résume chaque journée : côté où on app
 | Les couleurs des bandes de « Ma journée » | `config.js` | `COULEURS_JOURNEE` |
 | La phrase résumé de la journée | `config.js` | `TEXTES` (`resumeGauche`, `resumeDroite`, `resumeCentre`) |
 | Le seuil « appuyé d'un côté » (55 %) | `config.js` | `SEUIL_COTE` |
+| Les postures de la calibration (nom, consigne, couleur) | `config.js` | `POSTURES` |
+| Ajouter une posture (ex. « Penché vers l'avant ») | `config.js` | Copier une ligne de `POSTURES`, changer `id`, `nom`, `consigne`, `couleur` et `inclinaison` |
+| Remplacer un dessin par une vraie image | `config.js` | Ajouter `image: "images/nom.png"` à la posture, et mettre l'image dans un dossier `images` |
+| La forme des dessins automatiques | `dessins.js` | La fonction `dessinPosture` |
 
 ---
 
@@ -62,9 +69,10 @@ Le JavaScript retrouve les éléments de la page par leur **`id`**. Tu peux dép
 
 1. **Ne renomme pas et ne supprime pas les `id`** comme `btnConnecter`, `btnDemo`, `btnCalibrer`, `presence`, `immobile`, `curseur`, `dos`, etc.
 2. **Sur la silhouette**, chaque zone de capteur doit garder son `id` : `z_FG`, `z_FD`, `z_CG`, `z_CD`, `z_DOS_G`, `z_DOS_D` (la forme), et `t_FG`, `t_FD`, etc. (le pourcentage). Tu peux changer leur forme, leur taille et leur position.
-3. **Garde l'ordre des scripts** à la fin de `index.html` : `config.js`, `app.js`, `journee.js`, puis `sources.js`.
-4. **Ne modifie pas les sections ⚠️ de `config.js`** sans en parler à Vincent : elles doivent correspondre au programme de l'ESP32.
-5. **Après chaque modification, teste en mode démo** : si quelque chose ne bouge plus, appuie sur **F12** dans Chrome et regarde l'onglet **Console** pour voir l'erreur en rouge.
+3. **Garde l'ordre des scripts** à la fin de `index.html` : `config.js`, `dessins.js`, `app.js`, `journee.js`, puis `sources.js`. Après une mise à jour, **augmente le numéro `?v=`** de chaque fichier pour que Chrome recharge les nouvelles versions.
+4. **Dans `POSTURES`, garde « Bonne posture » en premier** : elle sert de référence (1,0) à tous les calculs.
+5. **Ne modifie pas les sections ⚠️ de `config.js`** sans en parler à Vincent : elles doivent correspondre au programme de l'ESP32.
+6. **Après chaque modification, teste en mode démo** : si quelque chose ne bouge plus, appuie sur **F12** dans Chrome et regarde l'onglet **Console** pour voir l'erreur en rouge.
 
 ---
 

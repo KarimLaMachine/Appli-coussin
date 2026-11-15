@@ -31,6 +31,33 @@ const ECART_MIN_CALIBRATION = 150;  // écart minimal vide/assis pour dire qu'un
 const SEUIL_COTE = 0.55;        // part du poids d'un côté (55 %) pour dire « appuyé à gauche / à droite »
 const DELAI_ENTRE_MOUVEMENTS = 3000;  // ms : un mouvement continu ne compte qu'une fois par 3 s
 
+// =====================================================================
+// POSTURES apprises pendant la calibration
+// ---------------------------------------------------------------------
+// Pendant la calibration, la personne prend chaque posture de cette liste.
+// L'application garde la « signature » de chacune, puis reconnaît en direct
+// la posture la plus ressemblante.
+//   ⚠️ La PREMIÈRE posture sert de référence (1,0 = cette posture) :
+//      garde « Bonne posture » en premier.
+//   - inclinaison : angle du dessin, en degrés (négatif = vers la gauche)
+//   - image : optionnel, chemin d'une image (ex. "images/droit.png") qui
+//             remplace le dessin automatique
+//   - demo : valeurs brutes FG, FD, DOS_G que la personne simulée envoie
+//            dans cette posture (mode démo seulement)
+// Pour ajouter une posture, copie une ligne et change son id et ses textes.
+// =====================================================================
+const POSTURES = [
+  { id: "droit",  nom: "Bonne posture",   consigne: "Assieds-toi droit, bien adossé",
+    bonne: true,  couleur: "#1d9e75", inclinaison: 0,   demo: [2600, 2500, 2400] },
+  { id: "gauche", nom: "Penché à gauche", consigne: "Penche-toi vers la gauche et reste ainsi",
+    bonne: false, couleur: "#378add", inclinaison: -18, demo: [3300, 1500, 2600] },
+  { id: "droite", nom: "Penché à droite", consigne: "Penche-toi vers la droite et reste ainsi",
+    bonne: false, couleur: "#d85a30", inclinaison: 18,  demo: [1600, 3200, 1200] },
+];
+const DUREE_MESURE_POSTURE = 8;         // secondes de mesure par posture
+const DUREE_CONFIRMATION_POSTURE = 3000; // ms : une posture doit durer 3 s avant d'être affichée
+const DISTANCE_MIN_POSTURES = 0.2;      // deux postures plus proches que ça « se ressemblent »
+
 // Résumé de la journée
 const JOURS_CONSERVES = 60;     // nombre de jours gardés dans le navigateur
 const COULEURS_JOURNEE = {
@@ -61,8 +88,11 @@ const TEXTES = {
   dosDecolle: "Décollé",
   calibre: "Calibré",
   pasCalibre: "Pas encore calibré : clique sur Calibrer",
-  etapeVide: "Lève-toi, coussin vide",
-  etapeAssis: "Assieds-toi comme d'habitude, adossé",
+  calibrationAncienne: "Refais la calibration pour que l'application reconnaisse tes postures",
+  etapeVide: "Lève-toi, ne touche pas au coussin",
+  resumePosture: "Tu étais en bonne posture {pct} % de ton temps assis.",
+  resumeHabitude: " Ta principale habitude : {nom} ({pct} %).",
+  resumeParfait: " Aucune mauvaise habitude détectée, bravo !",
   aucuneDonnee: "Aucune donnée pour cette journée.",
   resumeGauche: "Tu as passé {pct} % de ton temps assis appuyé sur la fesse gauche.",
   resumeDroite: "Tu as passé {pct} % de ton temps assis appuyé sur la fesse droite.",

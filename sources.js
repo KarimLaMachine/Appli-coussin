@@ -116,8 +116,9 @@ $("btnDemo").onclick = () => {
     let [duree, description, cible] = SCENARIO_DEMO[etape];
 
     // Pendant une calibration, la personne simulée suit les consignes
+    const enPosture = consigneCalibration && POSTURES.find(p => p.id === consigneCalibration);
     if (consigneCalibration === "vide") { cible = [0, 0, 0]; description = "calibration : coussin vide"; }
-    else if (consigneCalibration === "assis") { cible = [2600, 2500, 2400]; description = "calibration : assis"; }
+    else if (enPosture) { cible = enPosture.demo; description = "calibration : " + enPosture.nom.toLowerCase(); }
     else if (cible === null) {
       cible = [1500 + Math.random() * 2000, 1500 + Math.random() * 2000, Math.random() * 3000];
     }

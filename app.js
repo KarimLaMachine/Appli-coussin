@@ -10,19 +10,24 @@ const zones = Object.keys(INDEX);
 const zonesBranchees = zones.filter(z => INDEX[z] !== null);
 
 // ---------- État ----------
-let calibration = chargerCalibration();   // { zone: [vide, assis] }
+let calibration = chargerCalibration();   // { zones: { zone: [vide, bonne posture] }, signatures: { posture: {...} } }
 let derniere = null;                       // dernières valeurs brutes { zone: valeur }
 let precedente = null;                     // dernières valeurs normalisées
 let tempsActuel = 0;                       // temps de la dernière mesure (ms)
 let dernierMouvement = 0;                  // temps du dernier mouvement détecté (ms)
 let estAssis = false;
 let echantillonsCalibration = null;        // collecte pendant une étape de calibration
-let consigneCalibration = null;            // "vide" ou "assis" (utilisé par le mode démo)
+let consigneCalibration = null;            // "vide" ou l'id d'une posture (utilisé par le mode démo)
+let postureAffichee = null;                // posture confirmée, affichée à l'écran
+let postureCandidate = null, debutCandidate = 0;
 
 // ---------- Stockage de la calibration dans le navigateur ----------
 function chargerCalibration() {
-  try { return JSON.parse(localStorage.getItem(CLE_STOCKAGE)) || null; }
-  catch (e) { return null; }
+  try {
+    const c = JSON.parse(localStorage.getItem(CLE_STOCKAGE));
+    if (!c) return null;
+    return c.zones ? c : { zones: c, signatures: null };   // ancienne calibration (avant les postures)
+  } catch (e) { return null; }
 }
 function sauverCalibration(c) {
   try { localStorage.setItem(CLE_STOCKAGE, JSON.stringify(c)); } catch (e) {}
@@ -52,31 +57,61 @@ $("btnCalibrer").onclick = async () => {
   $("btnFermerCalib").hidden = true;
   $("calibResultat").innerHTML = "";
   $("calib").style.display = "block";
+  const total = 1 + POSTURES.length;
   try {
-    const vide = await mesurer("Étape 1 sur 2", TEXTES.etapeVide, "vide", 3, 5, 0);
-    const assis = await mesurer("Étape 2 sur 2", TEXTES.etapeAssis, "assis", 5, 10, 2);
-    const nouvelle = {};
-    const problemes = [];
-    let lignes = "";
-    for (const z of zonesBranchees) {
-      nouvelle[z] = [vide[z], assis[z]];
-      const ok = assis[z] - vide[z] >= ECART_MIN_CALIBRATION;
-      if (!ok) problemes.push(NOMS[z]);
-      lignes += `<tr><td>${NOMS[z]}</td><td>${Math.round(vide[z])}</td><td>${Math.round(assis[z])}</td>` +
-                `<td>${ok ? "✅" : "⚠️ aucun contact"}</td></tr>`;
+    // Étape 1 : coussin vide. Puis une étape par posture de config.js.
+    $("calibDessin").innerHTML = dessinPosture(null);
+    const vide = await mesurer(`Étape 1 sur ${total}`, TEXTES.etapeVide, "vide", 3, 5, 0);
+    const brutes = {};
+    for (let i = 0; i < POSTURES.length; i++) {
+      const p = POSTURES[i];
+      $("calibDessin").innerHTML = dessinPosture(p);
+      brutes[p.id] = await mesurer(`Étape ${i + 2} sur ${total} · ${p.nom}`, p.consigne, p.id, 5, DUREE_MESURE_POSTURE, 2);
     }
-    calibration = nouvelle;
+
+    // La première posture (la bonne) sert de référence : 1,0 = cette posture
+    const reference = brutes[POSTURES[0].id];
+    const zonesCal = {};
+    const problemes = [];
+    for (const z of zonesBranchees) {
+      zonesCal[z] = [vide[z], reference[z]];
+      if (reference[z] - vide[z] < ECART_MIN_CALIBRATION) problemes.push(NOMS[z] + " : aucun contact");
+    }
+    // Signature de chaque posture = ses valeurs normalisées
+    const signatures = {};
+    for (const p of POSTURES) signatures[p.id] = normaliserAvec(brutes[p.id], zonesCal);
+
+    // Deux postures trop semblables seront difficiles à distinguer
+    for (let i = 0; i < POSTURES.length; i++) {
+      for (let j = i + 1; j < POSTURES.length; j++) {
+        const a = POSTURES[i], b = POSTURES[j];
+        if (distance(signatures[a.id], signatures[b.id]) < DISTANCE_MIN_POSTURES) {
+          problemes.push(`« ${a.nom} » et « ${b.nom} » se ressemblent : exagère davantage`);
+        }
+      }
+    }
+
+    calibration = { zones: zonesCal, signatures };
     sauverCalibration(calibration);
+    postureAffichee = postureCandidate = null;
     bip(1200, 0.15); setTimeout(() => bip(1500, 0.25), 200);
+    $("calibDessin").innerHTML = "";
     $("calibEtape").textContent = "Terminé";
-    $("calibConsigne").textContent = problemes.length
-      ? "Calibré, mais vérifie : " + problemes.join(", ")
-      : "Calibration réussie";
-    $("calibResultat").innerHTML =
-      "<table><tr><th>Capteur</th><th>Vide</th><th>Assis</th><th></th></tr>" + lignes + "</table>";
+    $("calibConsigne").textContent = problemes.length ? "Calibré, mais vérifie :" : "Calibration réussie";
+
+    // Tableau : valeur brute de chaque capteur dans chaque position
+    let html = "<table><tr><th>Capteur</th><th>Vide</th>" + POSTURES.map(p => `<th>${p.nom}</th>`).join("") + "</tr>";
+    for (const z of zonesBranchees) {
+      html += `<tr><td>${NOMS[z]}</td><td>${Math.round(vide[z])}</td>` +
+              POSTURES.map(p => `<td>${Math.round(brutes[p.id][z])}</td>`).join("") + "</tr>";
+    }
+    html += "</table>";
+    if (problemes.length) html = `<ul class="problemes">${problemes.map(t => `<li>⚠️ ${t}</li>`).join("")}</ul>` + html;
+    $("calibResultat").innerHTML = html;
   } catch (e) {
     echantillonsCalibration = null;
     bip(300, 0.5);
+    $("calibDessin").innerHTML = "";
     $("calibEtape").textContent = "Échec";
     $("calibConsigne").textContent = "Calibration interrompue : " + e.message;
   }
@@ -139,20 +174,61 @@ function bip(freq = 880, duree = 0.15) {
 // =====================================================================
 // CALCULS
 // =====================================================================
-// Normalisation : 0 = aucun contact, 1,0 = comme pendant la calibration « assis ».
+// Normalisation : 0 = aucun contact, 1,0 = comme dans la bonne posture de la calibration.
 function normaliser(brut) {
+  return normaliserAvec(brut, calibration ? calibration.zones : null);
+}
+function normaliserAvec(brut, zonesCal) {
   const n = {};
   for (const z of zones) {
-    if (brut[z] === null) { n[z] = null; continue; }
-    if (calibration && calibration[z]) {
-      const [vide, assis] = calibration[z];
-      const etendue = assis - vide;
+    if (brut[z] === null || brut[z] === undefined) { n[z] = null; continue; }
+    if (zonesCal && zonesCal[z]) {
+      const [vide, reference] = zonesCal[z];
+      const etendue = reference - vide;
       n[z] = etendue > 0 ? Math.max(0, (brut[z] - vide) / etendue) : 0;
     } else {
       n[z] = brut[z] / 4095 * 1.5;              // sans calibration : estimation grossière
     }
   }
   return n;
+}
+
+// Écart entre deux ensembles de valeurs normalisées (distance « à vol d'oiseau »)
+function distance(a, b) {
+  let somme = 0;
+  for (const z of zonesBranchees) somme += (a[z] - b[z]) ** 2;
+  return Math.sqrt(somme);
+}
+
+// Posture la plus ressemblante parmi celles apprises pendant la calibration.
+// Sans calibration des postures : on se rabat sur l'équilibre gauche/droite.
+function reconnaitrePosture(n, partGauche) {
+  if (calibration && calibration.signatures) {
+    let meilleure = null, meilleureDistance = Infinity;
+    for (const p of POSTURES) {
+      const sig = calibration.signatures[p.id];
+      if (!sig) continue;
+      const d = distance(n, sig);
+      if (d < meilleureDistance) { meilleure = p; meilleureDistance = d; }
+    }
+    return meilleure;
+  }
+  const parId = id => POSTURES.find(p => p.id === id) || POSTURES[0];
+  if (partGauche === null) return POSTURES[0];
+  if (partGauche >= SEUIL_COTE) return parId("gauche");
+  if (partGauche <= 1 - SEUIL_COTE) return parId("droite");
+  return POSTURES[0];
+}
+
+// Une posture n'est affichée que si elle dure DUREE_CONFIRMATION_POSTURE
+function confirmerPosture(p) {
+  if (!p) { postureAffichee = postureCandidate = null; return null; }
+  if (!postureAffichee) { postureAffichee = postureCandidate = p; debutCandidate = tempsActuel; return p; }
+  if (!postureCandidate || p.id !== postureCandidate.id) { postureCandidate = p; debutCandidate = tempsActuel; }
+  if (postureCandidate.id !== postureAffichee.id && tempsActuel - debutCandidate >= DUREE_CONFIRMATION_POSTURE) {
+    postureAffichee = postureCandidate;
+  }
+  return postureAffichee;
 }
 
 // Couleur selon le niveau de pression (dégradé défini dans config.js)
@@ -248,7 +324,16 @@ function afficher() {
   const appuye = DOS.filter(z => n[z] !== null).some(z => n[z] > SEUIL_DOS);
   $("dos").textContent = !estAssis ? "--" : (appuye ? TEXTES.dosAppuye : TEXTES.dosDecolle);
 
-  $("infoCalib").textContent = calibration ? TEXTES.calibre : TEXTES.pasCalibre;
+  $("infoCalib").textContent = texteCalibration();
+
+  // --- Posture ---
+  const avant = postureAffichee;
+  const posture = confirmerPosture(estAssis ? reconnaitrePosture(n, pg) : null);
+  if (posture !== avant) {
+    $("dessinPosture").innerHTML = dessinPosture(posture);
+    $("posture").textContent = posture ? posture.nom : "--";
+    $("posture").style.color = !posture ? "var(--doux)" : (posture.bonne ? "var(--ok)" : "var(--alerte)");
+  }
 
   // --- Ajout de cette mesure au résumé de la journée (journee.js) ---
   if (typeof compterJournee === "function" && typeof sourceActive === "function" && sourceActive()) {
@@ -260,8 +345,14 @@ function afficher() {
       dosAppuye: aDos ? appuye : null,
       mouvement: mouvement,
       immobileMs: estAssis ? tempsActuel - dernierMouvement : 0,
+      posture: posture ? posture.id : null,
     });
   }
+}
+
+function texteCalibration() {
+  if (!calibration) return TEXTES.pasCalibre;
+  return calibration.signatures ? TEXTES.calibre : TEXTES.calibrationAncienne;
 }
 
 // ---------- État initial : silhouette « vide » et légende ----------
@@ -278,5 +369,6 @@ function afficher() {
   precedente = null;
   $("presence").textContent = "--";
   $("presence").style.color = "";
-  $("infoCalib").textContent = calibration ? TEXTES.calibre : TEXTES.pasCalibre;
+  $("dessinPosture").innerHTML = dessinPosture(null);
+  $("infoCalib").textContent = texteCalibration();
 })();
