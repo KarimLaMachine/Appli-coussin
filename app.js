@@ -4,7 +4,7 @@
 // Point d'entrée : traiter(valeurs, tempsMs), appelé par sources.js
 // chaque fois qu'une mesure arrive (Bluetooth, démo ou relecture).
 // =====================================================================
-
+bla bla bla
 const $ = id => document.getElementById(id);
 const zones = Object.keys(INDEX);
 const zonesBranchees = zones.filter(z => INDEX[z] !== null);
